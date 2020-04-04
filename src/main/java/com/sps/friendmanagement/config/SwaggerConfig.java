@@ -21,8 +21,7 @@ public class SwaggerConfig {
                 .groupName("Friend Management Service")
                 .useDefaultResponseMessages(false)
                 .apiInfo(apiInfo()).select()
-                .apis(RequestHandlerSelectors
-                		.withClassAnnotation(RestController.class))
+                .apis(RequestHandlerSelectors.withClassAnnotation(RestController.class))
                 .paths(PathSelectors.any())
                 .build();
     }
