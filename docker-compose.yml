@@ -1,0 +1,34 @@
+# Setup command 'docker-compose up -d --build'
+# Shutdown command 'docker-compose down'
+# URL  http://<host_ip>:8888/
+version: '3.2'
+
+services:
+  friend-management:
+    image: friend-management
+    build: .
+    restart: unless-stopped
+    ports:
+      - target: 8080
+        published: 8888
+        protocol: tcp
+        mode: host
+    container_name: friend-management
+
+  mysql-service:
+    image: mysql:5.7.27
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: friend_management
+    ports:
+      - target: 3306
+        published: 3306
+        protocol: tcp
+        mode: host
+    volumes:
+      - mysql-db-data:/var/lib/mysql
+    container_name: mysql-service
+
+volumes:
+  mysql-db-data:
