@@ -22,10 +22,6 @@ public class PersonService {
         return personRepository.save(person);
     }
 
-    public List<Person> saveAll(List<Person> people){
-        return personRepository.saveAll(people).stream().collect(Collectors.toList());
-    }
-
     public Person findByEmail(String email) {
         return personRepository.findByEmail(email);
     }
