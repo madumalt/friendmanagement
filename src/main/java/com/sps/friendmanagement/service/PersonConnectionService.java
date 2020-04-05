@@ -3,6 +3,7 @@ package com.sps.friendmanagement.service;
 import com.sps.friendmanagement.model.Person;
 import com.sps.friendmanagement.model.PersonConnection;
 import com.sps.friendmanagement.repository.PersonConnectionRepository;
+import com.sps.friendmanagement.util.FriendManagementUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
@@ -15,18 +16,21 @@ import java.util.stream.Collectors;
 public class PersonConnectionService {
     private final PersonService personService;
     private final PersonConnectionRepository personConnectionRepository;
+    private final FriendManagementUtil friendManagementUtil;
 
-    public PersonConnectionService(PersonService personService, PersonConnectionRepository personConnectionRepository) {
+    public PersonConnectionService(PersonService personService, PersonConnectionRepository personConnectionRepository,
+                                   FriendManagementUtil friendManagementUtil) {
         this.personService = personService;
         this.personConnectionRepository = personConnectionRepository;
+        this.friendManagementUtil = friendManagementUtil;
     }
 
     public List<PersonConnection> addFriends(List<Person> friends) {
         Person p1 = getPerson(friends.get(0));
         Person p2 = getPerson(friends.get(1));
 
-        PersonConnection fc1 = PersonConnection.builder().person(p1).friend(p2).build();
-        PersonConnection fc2 = PersonConnection.builder().person(p2).friend(p1).build();
+        PersonConnection fc1 = PersonConnection.builder().person(p1).friend(p2).isExplicitFriendship(true).build();
+        PersonConnection fc2 = PersonConnection.builder().person(p2).friend(p1).isExplicitFriendship(true).build();
 
         // Add Friends (i.e. save PersonConnetions) and return the saved PersonConnections.
         List<PersonConnection> personConnectionList = new ArrayList<>();
@@ -38,6 +42,7 @@ public class PersonConnectionService {
 
         if(personConnectionList != null && !personConnectionList.isEmpty()) {
             return personConnectionList.stream()
+                    .filter(personConnection -> personConnection.isExplicitFriendship())
                     .map(personConnection -> personConnection.getFriend().getEmail())
                     .collect(Collectors.toList());
         }
@@ -81,32 +86,16 @@ public class PersonConnectionService {
                 .findByFriendEmailNotBlocked(email);
 
         if (!CollectionUtils.isEmpty(personEmailNotBlockedFriends)) {
-
             personEmailNotBlockedFriends.forEach(nonBlockedPersonConnections -> {
 
-                // Retrieve all the connections of the person with whom the given personEmail has a connection.
-                List<PersonConnection> personConnections = personConnectionRepository
-                        .findByPersonEmail(nonBlockedPersonConnections.getPerson().getEmail());
+                Person person = nonBlockedPersonConnections.getPerson();
 
-                // Iterate through all the connections and pick should be notified people.
-                personConnections.forEach( personConnection -> {
-                    String personEmail = personConnection.getPerson().getEmail();
-                    String friendEmail = personConnection.getFriend().getEmail();
-
-                    // Friend means, connectivity should be vice-versa.
-                    if (friendEmail.equals(email)) {
-                        shouldBeNotifiedEmails.add(personEmail);
-                    }
-
-                    // If subscribed those should too be notified.
-                    if (personConnection.isSubscribed()) {
-                        shouldBeNotifiedEmails.add(personEmail);
-                    }
-
-                    if (text.contains(personEmail)) {
-                        shouldBeNotifiedEmails.add(personEmail);
-                    }
-                });
+                if (nonBlockedPersonConnections.isExplicitFriendship()) {
+                    shouldBeNotifiedEmails.add(person.getEmail());
+                } else if (nonBlockedPersonConnections.isSubscribed()) {
+                    shouldBeNotifiedEmails.add(person.getEmail());
+                }
+                shouldBeNotifiedEmails.addAll(friendManagementUtil.extractEmails(text));
             });
         }
 
@@ -121,8 +110,7 @@ public class PersonConnectionService {
      * @return PersonConnection
      */
     private PersonConnection blockUnblock(String personEmail, String friendEmail, boolean shouldBlock) {
-        PersonConnection personConnection = personConnectionRepository.findByPersonAndFriendEmail(
-                personEmail, friendEmail);
+        PersonConnection personConnection = getPersonConnectionToUpdate(personEmail, friendEmail);
         personConnection.setBlocked(shouldBlock);
         return personConnectionRepository.save(personConnection);
     }
@@ -135,8 +123,7 @@ public class PersonConnectionService {
      * @return PersonConnection
      */
     private PersonConnection subscribeUnsubscribe(String personEmail, String friendEmail, boolean shouldSubscribe) {
-        PersonConnection personConnection = personConnectionRepository.findByPersonAndFriendEmail(
-                personEmail, friendEmail);
+        PersonConnection personConnection = getPersonConnectionToUpdate(personEmail, friendEmail);
         personConnection.setSubscribed(shouldSubscribe);
         return personConnectionRepository.save(personConnection);
     }
@@ -155,5 +142,23 @@ public class PersonConnectionService {
             return person;
         }
         return checkedPerson;
+    }
+
+    /**
+     * Get the Connection from the DB.
+     * If the connection doesn't exist in the DB create new one.
+     * @param personEmail Email of the person
+     * @param friendEmail Email of the friend
+     * @return PersonConnection
+     */
+    private PersonConnection getPersonConnectionToUpdate(String personEmail, String friendEmail) {
+        PersonConnection personConnection = personConnectionRepository.findByPersonAndFriendEmail(
+                personEmail, friendEmail);
+        if (personConnection == null) {
+            Person person = getPerson(Person.builder().email(personEmail).build());
+            Person friend = getPerson(Person.builder().email(friendEmail).build());
+            personConnection = PersonConnection.builder().person(person).friend(friend).build();
+        }
+        return personConnection;
     }
 }

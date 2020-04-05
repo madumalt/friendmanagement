@@ -33,6 +33,9 @@ public class PersonConnection implements Serializable {
     @JoinColumn(name = "friend_id")
     private Person friend;
 
+    @Column(name="explicit_friendship")
+    private boolean isExplicitFriendship;
+
     @Column(name = "subscribed")
     private boolean isSubscribed;
 

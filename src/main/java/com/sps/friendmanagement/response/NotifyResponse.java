@@ -11,7 +11,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotifyResponse extends AcknowledgeResponse {
+public class NotifyResponse {
     private boolean isSuccess;
     private List<String> recipients;
 }
